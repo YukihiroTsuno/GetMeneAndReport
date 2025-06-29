@@ -1,0 +1,12 @@
+# vsign.jpの認証情報
+VSIGN_EMAIL=dogtail.cafe@gmail.com
+VSIGN_PASSWORD=jernug-gewdy9-Pexhaq
+
+# メール送信設定
+SENDER_EMAIL=dogtail.cafe+mealcard@gmail.com
+SENDER_PASSWORD=nqrg qfdk falo dcyb
+RECIPIENT_EMAIL=dogtail.cafe+mealcard@gmail.com
+
+# ログイン情報
+EMAIL=dogtail.cafe@gmail.com
+PASSWORD=jernug-gewdy9-Pexhaq
