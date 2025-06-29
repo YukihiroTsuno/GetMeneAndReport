@@ -5,7 +5,17 @@
 
 import logging
 import os
-from config import LOG_CONFIG, FILE_PATHS
+
+# ログ設定を直接定義（循環インポート回避）
+LOG_CONFIG = {
+    "level": "INFO",
+    "format": "%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+    "file": "logs/scraper.log"
+}
+
+FILE_PATHS = {
+    "logs_dir": "logs"
+}
 
 def setup_logger(name="meal_scraper"):
     """ログ設定を初期化"""

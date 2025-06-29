@@ -5,8 +5,14 @@ CSVファイル処理機能
 
 import pandas as pd
 import os
-from config import FILE_PATHS
 import logging
+
+# FILE_PATHSを直接定義
+FILE_PATHS = {
+    "csv_output": "meal_history.csv",
+    "debug_dir": "debug",
+    "logs_dir": "logs"
+}
 
 logger = logging.getLogger(__name__)
 

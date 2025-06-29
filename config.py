@@ -5,14 +5,22 @@
 
 import os
 from dotenv import load_dotenv
+from utils.encryption import CredentialManager
 
 # 環境変数を読み込み
 load_dotenv()
 
 # 基本設定
 MEAL_PAGE_URL = "https://hiroshima.meal.univ-coop.net/mypage"
-EMAIL = os.getenv("EMAIL", "dogtail.cafe@gmail.com")
-PASSWORD = os.getenv("PASSWORD", "")
+
+# 認証情報の取得（暗号化ファイルのみ）
+def get_credentials():
+    """暗号化された認証情報を取得（.credentialsのみ）"""
+    credential_manager = CredentialManager()
+    email, password = credential_manager.load_encrypted_credentials()
+    return email, password
+
+EMAIL, PASSWORD = get_credentials()
 
 # Selenium設定
 SELENIUM_CONFIG = {

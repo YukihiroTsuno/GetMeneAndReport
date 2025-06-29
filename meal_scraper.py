@@ -2,12 +2,12 @@
 食事履歴スクレイピング
 広島大学生協の食事履歴を取得してCSVファイルに保存
 
-Version: 1.0.0
+Version: 1.1.0
 Author: AI Assistant
 Date: 2024-12-19
 """
 
-__version__ = "1.0.0"
+__version__ = "1.1.0"
 
 import time
 from typing import Optional, List, Dict, Any
@@ -372,10 +372,10 @@ class MealHistoryScraper:
                 logger.error("食事履歴データの取得に失敗しました")
                 return False
             
-            # CSVファイルに保存
+            # CSVファイルに保存（全データ）
             csv_file_path = self.csv_handler.save_data(structured_data)
             
-            # メール通知を送信
+            # メール通知を送信（1週間分のみ表示）
             self.email_sender.send_notification(structured_data, csv_file_path)
             
             logger.info("食事履歴スクレイピングが完了しました")
