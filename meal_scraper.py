@@ -1,6 +1,6 @@
 """
 食事履歴スクレイピング
-広島大学生協の食事履歴を取得してCSVファイルに保存
+広島大学生協の食事履歴を自動取得
 
 Version: 1.1.0
 Author: AI Assistant
@@ -10,21 +10,20 @@ Date: 2024-12-19
 __version__ = "1.1.0"
 
 import time
-from typing import Optional, List, Dict, Any
+import logging
 from selenium import webdriver
-from selenium.webdriver.chrome.service import Service
-from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
-from selenium.common.exceptions import TimeoutException, NoSuchElementException
+from selenium.webdriver.chrome.service import Service
+from selenium.webdriver.chrome.options import Options
+from selenium.common.exceptions import NoSuchElementException, TimeoutException
 from webdriver_manager.chrome import ChromeDriverManager
+from utils.logger import setup_logger
+from utils.email_sender import EmailSender
 
-from config import (
-    MEAL_PAGE_URL, EMAIL, PASSWORD, SELENIUM_CONFIG, 
-    SELECTORS, WAIT_TIMES
-)
-from utils import setup_logger, EmailSender, CSVHandler
+# 設定をインポート
+from config import EMAIL, PASSWORD, SELECTORS, WAIT_TIMES, SELENIUM_CONFIG, MEAL_PAGE_URL
 
 logger = setup_logger()
 
@@ -32,10 +31,9 @@ class MealHistoryScraper:
     """食事履歴スクレイピングクラス"""
     
     def __init__(self):
-        self.driver: Optional[webdriver.Chrome] = None
-        self.wait: Optional[WebDriverWait] = None
+        self.driver = None
+        self.wait = None
         self.email_sender = EmailSender()
-        self.csv_handler = CSVHandler()
     
     def setup_driver(self):
         """Chromeドライバーをセットアップ"""
@@ -44,37 +42,28 @@ class MealHistoryScraper:
             
             # Chromeオプションを設定
             chrome_options = Options()
+            
             if SELENIUM_CONFIG["headless"]:
                 chrome_options.add_argument("--headless")
             
-            chrome_options.add_argument(f"--window-size={SELENIUM_CONFIG['window_size'][0]},{SELENIUM_CONFIG['window_size'][1]}")
             chrome_options.add_argument("--no-sandbox")
             chrome_options.add_argument("--disable-dev-shm-usage")
             chrome_options.add_argument("--disable-gpu")
-            chrome_options.add_argument("--disable-extensions")
-            chrome_options.add_argument("--disable-plugins")
-            chrome_options.add_argument("--disable-images")
-            chrome_options.add_argument("--disable-javascript")
+            chrome_options.add_argument("--window-size=1920,1080")
+            chrome_options.add_argument("--user-agent=Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
             
-            # ChromeDriverManagerでドライバーをインストール
+            # ChromeDriverManagerでドライバーを自動管理
             service = Service(ChromeDriverManager().install())
             
-            # WebDriverを初期化
+            # WebDriverを作成
             self.driver = webdriver.Chrome(service=service, options=chrome_options)
-            
-            # タイムアウト設定
-            self.driver.implicitly_wait(SELENIUM_CONFIG["implicit_wait"])
-            self.driver.set_page_load_timeout(SELENIUM_CONFIG["page_load_timeout"])
-            self.driver.set_script_timeout(SELENIUM_CONFIG["script_timeout"])
-            
-            # WebDriverWaitを設定
-            self.wait = WebDriverWait(self.driver, SELENIUM_CONFIG["implicit_wait"])
+            self.wait = WebDriverWait(self.driver, WAIT_TIMES["timeout"])
             
             logger.info("Chromeドライバーのセットアップが完了しました")
             return True
             
         except Exception as e:
-            logger.error(f"Chromeドライバーのセットアップエラー: {e}")
+            logger.error(f"Chromeドライバーセットアップエラー: {e}")
             return False
     
     def login(self):
@@ -114,13 +103,15 @@ class MealHistoryScraper:
             email_field = self.driver.find_element(By.CSS_SELECTOR, SELECTORS["email_field"])
             password_field = self.driver.find_element(By.CSS_SELECTOR, SELECTORS["password_field"])
 
-            email_field.clear()
-            email_field.send_keys(EMAIL)
-            logger.info(f"メールアドレスを入力: {EMAIL}")
-
-            password_field.clear()
-            password_field.send_keys(PASSWORD)
-            logger.info("パスワードを入力しました")
+            if EMAIL and PASSWORD:
+                email_field.clear()
+                email_field.send_keys(EMAIL)
+                password_field.clear()
+                password_field.send_keys(PASSWORD)
+            else:
+                logger.error("認証情報が設定されていません")
+                return False
+            
             # 入力されたパスワード値をログ出力（デバッグ用）
             try:
                 actual_pw = password_field.get_attribute('value')
@@ -226,10 +217,14 @@ class MealHistoryScraper:
             password_field = self.driver.find_element(By.CSS_SELECTOR, 'input[name="password"]')
             
             # ログイン情報を入力
-            email_field.clear()
-            email_field.send_keys(EMAIL)
-            password_field.clear()
-            password_field.send_keys(PASSWORD)
+            if EMAIL and PASSWORD:
+                email_field.clear()
+                email_field.send_keys(EMAIL)
+                password_field.clear()
+                password_field.send_keys(PASSWORD)
+            else:
+                logger.error("認証情報が設定されていません")
+                return False
             
             # ログインボタンをクリック
             login_button = self.driver.find_element(By.CSS_SELECTOR, 'button#next')
@@ -372,11 +367,8 @@ class MealHistoryScraper:
                 logger.error("食事履歴データの取得に失敗しました")
                 return False
             
-            # CSVファイルに保存（全データ）
-            csv_file_path = self.csv_handler.save_data(structured_data)
-            
             # メール通知を送信（1週間分のみ表示）
-            self.email_sender.send_notification(structured_data, csv_file_path)
+            self.email_sender.send_notification(structured_data)
             
             logger.info("食事履歴スクレイピングが完了しました")
             return True

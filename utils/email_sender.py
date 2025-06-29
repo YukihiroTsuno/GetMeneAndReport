@@ -77,7 +77,7 @@ class EmailSender:
         logger.info(f"全データ: {len(structured_data)}件, 1週間分データ: {len(recent_data)}件")
         return recent_data
     
-    def send_notification(self, structured_data, csv_file_path=None):
+    def send_notification(self, structured_data):
         """食事履歴データの通知メールを送信（HTML形式）"""
         if not all([self.sender_email, self.sender_password, self.recipient_email]):
             logger.warning("メール設定が不完全なため、メール送信をスキップします")
@@ -134,7 +134,7 @@ class EmailSender:
             return date_str
     
     def _create_html_email_body(self, structured_data, total_data_count=None):
-        """iPhone最適化されたHTMLメール本文を作成"""
+        """iPhone最適化されたHTMLメール本文を作成（インラインCSS + テーブルレイアウト）"""
         # 現在の日時を取得
         current_time = datetime.now().strftime("%Y年%m月%d日 %H:%M")
         
@@ -163,137 +163,37 @@ class EmailSender:
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>食事履歴データ</title>
-    <style>
-        body {{
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            margin: 0;
-            padding: 0;
-            background-color: #f5f5f7;
-            color: #1d1d1f;
-            line-height: 1.5;
-        }}
-        .container {{
-            max-width: 600px;
-            margin: 0 auto;
-            background-color: #ffffff;
-            border-radius: 8px;
-            overflow: hidden;
-        }}
-        .header {{
-            background-color: #007AFF;
-            color: white;
-            padding: 20px;
-            text-align: center;
-        }}
-        .header h1 {{
-            margin: 0;
-            font-size: 20px;
-            font-weight: 600;
-        }}
-        .header .subtitle {{
-            margin: 8px 0 0 0;
-            font-size: 12px;
-            opacity: 0.9;
-        }}
-        .content {{
-            padding: 16px;
-        }}
-        .summary {{
-            background-color: #f2f2f7;
-            border-radius: 6px;
-            padding: 12px;
-            margin-bottom: 16px;
-            border-left: 3px solid #007AFF;
-        }}
-        .summary h3 {{
-            margin: 0 0 8px 0;
-            color: #007AFF;
-            font-size: 14px;
-        }}
-        .summary p {{
-            margin: 0;
-            font-size: 12px;
-            color: #666;
-        }}
-        .date-section {{
-            margin-bottom: 20px;
-            border: 1px solid #e5e5ea;
-            border-radius: 6px;
-            overflow: hidden;
-        }}
-        .date-header {{
-            background-color: #8e8e93;
-            color: white;
-            padding: 12px 16px;
-            font-weight: 600;
-            font-size: 14px;
-            text-align: center;
-        }}
-        .meal-item {{
-            padding: 12px 16px;
-            border-bottom: 1px solid #e5e5ea;
-            background-color: #ffffff;
-        }}
-        .meal-item:last-child {{
-            border-bottom: none;
-        }}
-        .meal-item:nth-child(even) {{
-            background-color: #f9f9f9;
-        }}
-        .time-badge {{
-            background-color: #007AFF;
-            color: white;
-            padding: 4px 8px;
-            border-radius: 4px;
-            font-size: 11px;
-            font-weight: 500;
-            display: inline-block;
-            margin-bottom: 4px;
-        }}
-        .meal-title {{
-            font-weight: 500;
-            color: #1d1d1f;
-            margin-bottom: 4px;
-            font-size: 13px;
-        }}
-        .meal-menus {{
-            color: #666;
-            font-size: 12px;
-            margin-bottom: 4px;
-        }}
-        .meal-amount {{
-            color: #34c759;
-            font-weight: 500;
-            font-size: 12px;
-        }}
-        .footer {{
-            background-color: #f2f2f7;
-            padding: 12px 16px;
-            text-align: center;
-            border-top: 1px solid #e5e5ea;
-            font-size: 10px;
-            color: #666;
-        }}
-        .app-info {{
-            margin-top: 6px;
-            padding-top: 6px;
-            border-top: 1px solid #d1d1d6;
-        }}
-    </style>
 </head>
-<body>
-    <div class="container">
-        <div class="header">
-            <h1>🍽️ 食事履歴データ</h1>
-            <div class="subtitle">取得完了: {current_time}</div>
-        </div>
-        
-        <div class="content">
-            <div class="summary">
-                <h3>📊 取得サマリー</h3>
-                <p>{summary_text}</p>
-                <p>取得期間: <strong>{self._format_date_with_weekday(structured_data[-1]['date']) if structured_data else 'N/A'} 〜 {self._format_date_with_weekday(structured_data[0]['date']) if structured_data else 'N/A'}</strong></p>
-            </div>
+<body style="margin: 0; padding: 0; font-family: Arial, sans-serif; background-color: #f0f0f0; color: #333333; line-height: 1.5;">
+    <!-- メインコンテナテーブル -->
+    <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #f0f0f0;">
+        <tr>
+            <td align="center" style="padding: 20px 0;">
+                <!-- メールコンテンツテーブル -->
+                <table width="600" cellpadding="0" cellspacing="0" style="max-width: 600px; background-color: #ffffff; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 10px rgba(0,0,0,0.1);">
+                    
+                    <!-- ヘッダー -->
+                    <tr>
+                        <td style="background-color: #007AFF; color: #ffffff; padding: 20px; text-align: center;">
+                            <h1 style="margin: 0; font-size: 20px; font-weight: 600; font-family: Arial, sans-serif;">🍽️ 食事履歴データ</h1>
+                            <div style="margin: 8px 0 0 0; font-size: 12px; opacity: 0.9; font-family: Arial, sans-serif;">取得完了: {current_time}</div>
+                        </td>
+                    </tr>
+                    
+                    <!-- コンテンツエリア -->
+                    <tr>
+                        <td style="padding: 16px;">
+                            
+                            <!-- サマリー情報 -->
+                            <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #f2f2f7; border-radius: 6px; margin-bottom: 16px; border-left: 3px solid #007AFF;">
+                                <tr>
+                                    <td style="padding: 12px;">
+                                        <h3 style="margin: 0 0 8px 0; color: #007AFF; font-size: 14px; font-family: Arial, sans-serif;">📊 取得サマリー</h3>
+                                        <p style="margin: 0; font-size: 12px; color: #666666; font-family: Arial, sans-serif;">{summary_text}</p>
+                                        <p style="margin: 4px 0 0 0; font-size: 12px; color: #666666; font-family: Arial, sans-serif;">取得期間: <strong>{self._format_date_with_weekday(structured_data[-1]['date']) if structured_data else 'N/A'} 〜 {self._format_date_with_weekday(structured_data[0]['date']) if structured_data else 'N/A'}</strong></p>
+                                    </td>
+                                </tr>
+                            </table>
         """
         
         # 日付ごとにデータを表示
@@ -302,12 +202,17 @@ class EmailSender:
             # 最初の食事データから元の日付文字列を取得
             original_date = meals[0]['date'] if meals else date
             formatted_date = self._format_date_with_weekday(original_date)
+            
             html += f"""
-            <div class="date-section">
-                <div class="date-header">📅 {formatted_date}</div>
+                            <!-- 日付セクション -->
+                            <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom: 20px; border: 1px solid #e5e5ea; border-radius: 6px; overflow: hidden;">
+                                <!-- 日付ヘッダー -->
+                                <tr>
+                                    <td style="background-color: #8e8e93; color: #ffffff; padding: 12px 16px; font-weight: 600; font-size: 14px; text-align: center; font-family: Arial, sans-serif;">📅 {formatted_date}</td>
+                                </tr>
             """
             
-            for meal in meals:
+            for i, meal in enumerate(meals):
                 # 時間帯に応じてアイコンを設定
                 hour = meal['hour']
                 if '朝' in hour or 'breakfast' in hour.lower():
@@ -319,29 +224,43 @@ class EmailSender:
                 else:
                     time_icon = "🍽️"
                 
+                # 偶数行の背景色を変更
+                bg_color = "#f9f9f9" if i % 2 == 1 else "#ffffff"
+                
                 html += f"""
-                <div class="meal-item">
-                    <div class="time-badge">{time_icon} {meal['hour']}</div>
-                    <div class="meal-title">{meal['title'] if 'title' in meal else '食事'}</div>
-                    <div class="meal-menus">{', '.join(meal['menus'])}</div>
-                    <div class="meal-amount">💰 {meal['amount']}</div>
-                </div>
+                                <!-- 食事アイテム -->
+                                <tr>
+                                    <td style="padding: 12px 16px; border-bottom: 1px solid #e5e5ea; background-color: {bg_color};">
+                                        <div style="background-color: #007AFF; color: #ffffff; padding: 4px 8px; border-radius: 4px; font-size: 11px; font-weight: 500; display: inline-block; margin-bottom: 4px; font-family: Arial, sans-serif;">{time_icon} {meal['hour']}</div>
+                                        <div style="font-weight: 500; color: #1d1d1f; margin-bottom: 4px; font-size: 13px; font-family: Arial, sans-serif;">{meal['title'] if 'title' in meal else '食事'}</div>
+                                        <div style="color: #666666; font-size: 12px; margin-bottom: 4px; font-family: Arial, sans-serif;">{', '.join(meal['menus'])}</div>
+                                        <div style="color: #34c759; font-weight: 500; font-size: 12px; font-family: Arial, sans-serif;">💰 {meal['amount']}</div>
+                                    </td>
+                                </tr>
                 """
             
             html += """
-            </div>
+                            </table>
             """
         
         html += """
-        </div>
-        
-        <div class="footer">
-            <div>このメールは自動生成されました</div>
-            <div class="app-info">
-                <strong>GetMeneAndReport</strong> v1.1.0
-            </div>
-        </div>
-    </div>
+                        </td>
+                    </tr>
+                    
+                    <!-- フッター -->
+                    <tr>
+                        <td style="background-color: #f2f2f7; padding: 12px 16px; text-align: center; border-top: 1px solid #e5e5ea;">
+                            <div style="font-size: 10px; color: #666666; font-family: Arial, sans-serif;">このメールは自動生成されました</div>
+                            <div style="margin-top: 6px; padding-top: 6px; border-top: 1px solid #d1d1d6; font-size: 10px; color: #666666; font-family: Arial, sans-serif;">
+                                <strong>GetMeneAndReport</strong> v1.2.0
+                            </div>
+                        </td>
+                    </tr>
+                    
+                </table>
+            </td>
+        </tr>
+    </table>
 </body>
 </html>
         """

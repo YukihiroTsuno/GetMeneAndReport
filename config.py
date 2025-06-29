@@ -85,6 +85,7 @@ LOG_CONFIG = {
 
 # 待機時間設定
 WAIT_TIMES = {
+    "timeout": 30,
     "page_load": 5,
     "element_load": 3,
     "after_click": 8,

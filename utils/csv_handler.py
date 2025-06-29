@@ -6,6 +6,8 @@ CSVファイル処理機能
 import pandas as pd
 import os
 import logging
+import ast
+import re
 
 # FILE_PATHSを直接定義
 FILE_PATHS = {
@@ -21,6 +23,36 @@ class CSVHandler:
     
     def __init__(self):
         self.output_path = FILE_PATHS["csv_output"]
+    
+    def _parse_menus_string(self, menus_str):
+        """メニュー文字列をリストに変換"""
+        try:
+            if not menus_str or menus_str == 'nan':
+                return []
+            
+            # 文字列をクリーンアップ
+            menus_str = str(menus_str).strip()
+            
+            # リスト形式の文字列を安全に評価
+            if menus_str.startswith('[') and menus_str.endswith(']'):
+                try:
+                    # ast.literal_evalを使用して安全に評価
+                    menus_list = ast.literal_eval(menus_str)
+                    if isinstance(menus_list, list):
+                        return menus_list
+                except (ValueError, SyntaxError):
+                    pass
+            
+            # 単一のメニュー項目の場合
+            if menus_str.startswith("'") and menus_str.endswith("'"):
+                return [menus_str[1:-1]]  # クォートを除去
+            
+            # その他の場合は単一項目として扱う
+            return [menus_str]
+            
+        except Exception as e:
+            logger.warning(f"メニュー文字列の解析エラー: {e}, 文字列: {menus_str}")
+            return [menus_str] if menus_str else []
     
     def save_data(self, structured_data):
         """構造化データをCSVファイルに保存"""
@@ -53,6 +85,11 @@ class CSVHandler:
             
             df = pd.read_csv(path, encoding='utf-8-sig')
             data = df.to_dict('records')
+            
+            # メニューデータを正しく変換
+            for record in data:
+                if 'menus' in record:
+                    record['menus'] = self._parse_menus_string(record['menus'])
             
             logger.info(f"CSVファイルから読み込みました: {path}")
             return data
