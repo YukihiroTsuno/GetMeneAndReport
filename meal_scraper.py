@@ -2,25 +2,23 @@
 食事履歴スクレイピング
 広島大学生協の食事履歴を自動取得
 
-Version: 1.1.0
+Version: 1.3.0
 Author: AI Assistant
 Date: 2024-12-19
 """
 
-__version__ = "1.1.0"
+__version__ = "1.3.0"
 
-import time
 import logging
-from selenium import webdriver
-from selenium.webdriver.common.by import By
-from selenium.webdriver.support.ui import WebDriverWait
-from selenium.webdriver.support import expected_conditions as EC
-from selenium.webdriver.chrome.service import Service
-from selenium.webdriver.chrome.options import Options
-from selenium.common.exceptions import NoSuchElementException, TimeoutException
-from webdriver_manager.chrome import ChromeDriverManager
+from typing import Dict, Any, List, Optional
 from utils.logger import setup_logger
 from utils.email_sender import EmailSender
+from utils.webdriver_manager import WebDriverManager
+from utils.selector_manager import SelectorManager
+from utils.login_manager import LoginManager
+from utils.navigation_manager import NavigationManager
+from utils.data_extractor import DataExtractor
+from utils.csv_handler import CSVHandler
 
 # 設定をインポート
 from config import EMAIL, PASSWORD, SELECTORS, WAIT_TIMES, SELENIUM_CONFIG, MEAL_PAGE_URL
@@ -28,346 +26,86 @@ from config import EMAIL, PASSWORD, SELECTORS, WAIT_TIMES, SELENIUM_CONFIG, MEAL
 logger = setup_logger()
 
 class MealHistoryScraper:
-    """食事履歴スクレイピングクラス"""
+    """食事履歴スクレイピングクラス（統合インターフェース）"""
     
     def __init__(self):
-        self.driver = None
-        self.wait = None
+        # 設定を準備
+        self.selenium_config = SELENIUM_CONFIG
+        self.wait_times = WAIT_TIMES
+        self.credentials = (EMAIL or "", PASSWORD or "")
+        self.login_url = MEAL_PAGE_URL
+        
+        # 各マネージャーを初期化
+        self.webdriver_manager = WebDriverManager(self.selenium_config)
+        self.selector_manager = SelectorManager(SELECTORS)
+        self.login_manager = LoginManager(
+            self.webdriver_manager, 
+            self.selector_manager, 
+            self.credentials, 
+            self.wait_times
+        )
+        self.navigation_manager = NavigationManager(
+            self.webdriver_manager,
+            self.selector_manager,
+            self.login_manager,
+            self.wait_times
+        )
+        self.data_extractor = DataExtractor(
+            self.webdriver_manager,
+            self.selector_manager,
+            self.navigation_manager
+        )
+        
+        # その他のコンポーネント
         self.email_sender = EmailSender()
+        self.csv_handler = CSVHandler()
     
-    def setup_driver(self):
-        """Chromeドライバーをセットアップ"""
-        try:
-            logger.info("Chromeドライバーをセットアップ中...")
-            
-            # Chromeオプションを設定
-            chrome_options = Options()
-            
-            if SELENIUM_CONFIG["headless"]:
-                chrome_options.add_argument("--headless")
-            
-            chrome_options.add_argument("--no-sandbox")
-            chrome_options.add_argument("--disable-dev-shm-usage")
-            chrome_options.add_argument("--disable-gpu")
-            chrome_options.add_argument("--window-size=1920,1080")
-            chrome_options.add_argument("--user-agent=Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
-            
-            # ChromeDriverManagerでドライバーを自動管理
-            service = Service(ChromeDriverManager().install())
-            
-            # WebDriverを作成
-            self.driver = webdriver.Chrome(service=service, options=chrome_options)
-            self.wait = WebDriverWait(self.driver, WAIT_TIMES["timeout"])
-            
-            logger.info("Chromeドライバーのセットアップが完了しました")
-            return True
-            
-        except Exception as e:
-            logger.error(f"Chromeドライバーセットアップエラー: {e}")
-            return False
-    
-    def login(self):
-        """ログイン処理"""
-        try:
-            logger.info("ログイン処理を開始します")
-            
-            if not self.driver or not self.wait:
-                logger.error("ドライバーが初期化されていません")
-                return False
-            
-            # ページにアクセス
-            self.driver.get(MEAL_PAGE_URL)
-            time.sleep(WAIT_TIMES["page_load"])
-            
-            current_url = self.driver.current_url
-            logger.info(f"アクセス後のURL: {current_url}")
-            
-            # デバッグ用にHTMLを保存
-            try:
-                html = self.driver.page_source
-                with open("debug/login_page_debug.html", "w", encoding="utf-8") as f:
-                    f.write(html)
-                logger.info("デバッグ用HTMLを保存しました: debug/login_page_debug.html")
-            except Exception as e:
-                logger.warning(f"HTML保存エラー: {e}")
-            
-            # ログインフォームが表示されているかチェック
-            try:
-                email_field = self.wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, SELECTORS["email_field"])))
-                logger.info("ログインフォームが表示されています")
-            except TimeoutException:
-                logger.info("ログインフォームが見つかりません。既にログイン済みの可能性があります")
-                return True
-            
-            # ログイン情報を入力
-            email_field = self.driver.find_element(By.CSS_SELECTOR, SELECTORS["email_field"])
-            password_field = self.driver.find_element(By.CSS_SELECTOR, SELECTORS["password_field"])
-
-            if EMAIL and PASSWORD:
-                email_field.clear()
-                email_field.send_keys(EMAIL)
-                password_field.clear()
-                password_field.send_keys(PASSWORD)
-            else:
-                logger.error("認証情報が設定されていません")
-                return False
-            
-            # 入力されたパスワード値をログ出力（デバッグ用）
-            try:
-                actual_pw = password_field.get_attribute('value')
-                logger.info(f"パスワード欄の値（デバッグ用）: {actual_pw}")
-            except Exception as e:
-                logger.warning(f"パスワード値取得エラー: {e}")
-            
-            # ログインボタンを探す（複数のセレクターを試す）
-            login_button = None
-            login_button_selectors = [
-                SELECTORS["login_button"],
-                "input[type='submit']",
-                "button:contains('ログイン')",
-                "button:contains('Login')",
-                "input[value*='ログイン']",
-                "input[value*='Login']"
-            ]
-            
-            for selector in login_button_selectors:
-                try:
-                    if ":contains(" in selector:
-                        # XPathに変換
-                        text = selector.split("'")[1]
-                        xpath_selector = f"//button[contains(text(), '{text}')]"
-                        login_button = self.driver.find_element(By.XPATH, xpath_selector)
-                    else:
-                        login_button = self.driver.find_element(By.CSS_SELECTOR, selector)
-                    
-                    if login_button:
-                        logger.info(f"ログインボタン発見: {selector}")
-                        break
-                except NoSuchElementException:
-                    continue
-            
-            if not login_button:
-                logger.error("ログインボタンが見つかりませんでした")
-                return False
-            
-            # ログインボタンをクリック
-            login_button.click()
-            logger.info("ログインボタンをクリックしました")
-            
-            # ログイン後の処理を待機
-            time.sleep(WAIT_TIMES["after_login"])
-            
-            current_url = self.driver.current_url
-            logger.info(f"ログイン後のURL: {current_url}")
-            
-            return True
-            
-        except Exception as e:
-            logger.error(f"ログイン処理エラー: {e}")
-            return False
-    
-    def navigate_to_meal_history(self):
-        """食事履歴ページに遷移"""
-        try:
-            logger.info("食事履歴ページに遷移中...")
-            
-            if not self.driver or not self.wait:
-                logger.error("ドライバーが初期化されていません")
-                return False
-            
-            # ミール利用履歴リンクを探してクリック
-            meal_history_link = self.wait.until(
-                EC.element_to_be_clickable((By.CSS_SELECTOR, SELECTORS["meal_history_link"]))
-            )
-            
-            href = meal_history_link.get_attribute("href")
-            link_text = meal_history_link.text
-            logger.info(f"リンク先URL: {href}")
-            logger.info(f"リンクテキスト: {link_text.strip() if link_text else 'N/A'}")
-            
-            meal_history_link.click()
-            time.sleep(WAIT_TIMES["after_click"])
-            
-            # 遷移後の確認
-            current_url = self.driver.current_url
-            logger.info(f"遷移後のURL: {current_url}")
-            
-            # 2回目のログインが必要な場合
-            if "login" in current_url.lower():
-                logger.info("2回目のログインが必要です")
-                return self.perform_second_login()
-            
-            return True
-            
-        except Exception as e:
-            logger.error(f"食事履歴ページ遷移エラー: {e}")
-            return False
-    
-    def perform_second_login(self):
-        """2回目のログイン処理"""
-        try:
-            logger.info("2回目のログイン処理を開始します")
-            
-            if not self.driver or not self.wait:
-                logger.error("ドライバーが初期化されていません")
-                return False
-            
-            # ログインフォームを探す
-            email_field = self.wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, 'input[name="email"]')))
-            password_field = self.driver.find_element(By.CSS_SELECTOR, 'input[name="password"]')
-            
-            # ログイン情報を入力
-            if EMAIL and PASSWORD:
-                email_field.clear()
-                email_field.send_keys(EMAIL)
-                password_field.clear()
-                password_field.send_keys(PASSWORD)
-            else:
-                logger.error("認証情報が設定されていません")
-                return False
-            
-            # ログインボタンをクリック
-            login_button = self.driver.find_element(By.CSS_SELECTOR, 'button#next')
-            login_button.click()
-            
-            time.sleep(WAIT_TIMES["after_login"])
-            
-            current_url = self.driver.current_url
-            logger.info(f"2回目ログイン後のURL: {current_url}")
-            
-            return True
-            
-        except Exception as e:
-            logger.error(f"2回目ログイン処理エラー: {e}")
-            return False
-    
-    def select_usage_detail(self):
-        """ご利用明細を選択"""
-        try:
-            logger.info("ご利用明細を選択中...")
-            
-            if not self.driver or not self.wait:
-                logger.error("ドライバーが初期化されていません")
-                return False
-            
-            # ご利用明細リンクを探してクリック
-            usage_detail_link = self.wait.until(
-                EC.element_to_be_clickable((By.CSS_SELECTOR, SELECTORS["usage_detail_link"]))
-            )
-            
-            usage_detail_link.click()
-            time.sleep(WAIT_TIMES["after_click"])
-            
-            current_url = self.driver.current_url
-            logger.info(f"ご利用明細遷移後のURL: {current_url}")
-            
-            return True
-            
-        except Exception as e:
-            logger.error(f"ご利用明細選択エラー: {e}")
-            return False
-    
-    def extract_meal_data(self):
-        """食事履歴データを抽出"""
-        try:
-            logger.info("食事履歴データの抽出を開始します")
-            
-            if not self.driver:
-                logger.error("ドライバーが初期化されていません")
-                return []
-            
-            # 「もっと見る」ボタンがあればクリック
-            try:
-                more_button = self.driver.find_element(By.CSS_SELECTOR, SELECTORS["more_button"])
-                if more_button.is_displayed():
-                    logger.info("「もっと見る」ボタンをクリックします")
-                    more_button.click()
-                    time.sleep(WAIT_TIMES["element_load"])
-            except NoSuchElementException:
-                logger.info("「もっと見る」ボタンは見つかりませんでした")
-            
-            # 食事履歴記事を取得
-            history_articles = self.driver.find_elements(By.CSS_SELECTOR, SELECTORS["history_articles"])
-            logger.info(f"発見された食事履歴記事数: {len(history_articles)}")
-            
-            structured_data = []
-            
-            for article in history_articles:
-                try:
-                    # 日付情報を取得
-                    date_element = article.find_element(By.CSS_SELECTOR, SELECTORS["date_element"])
-                    month = date_element.find_element(By.CSS_SELECTOR, SELECTORS["month_span"]).text.strip()
-                    date = date_element.find_element(By.CSS_SELECTOR, SELECTORS["date_span"]).text.strip()
-                    day = date_element.find_element(By.CSS_SELECTOR, SELECTORS["day_span"]).text.strip()
-                    date_str = f"{month}月{date}日({day})"
-                    
-                    # 詳細要素を取得
-                    detail_elements = article.find_elements(By.CSS_SELECTOR, SELECTORS["detail_elements"])
-                    
-                    for detail_element in detail_elements:
-                        try:
-                            # 時刻、メニュー、金額を取得
-                            hour = detail_element.find_element(By.CSS_SELECTOR, SELECTORS["hour_element"]).text.strip()
-                            
-                            menu_elements = detail_element.find_elements(By.CSS_SELECTOR, SELECTORS["menu_elements"])
-                            menus = [menu.text.strip() for menu in menu_elements if menu.text.strip()]
-                            
-                            amount_element = detail_element.find_element(By.CSS_SELECTOR, SELECTORS["amount_element"])
-                            amount = amount_element.text.strip()
-                            
-                            # 構造化データに追加
-                            data = {
-                                'date': date_str,
-                                'hour': hour,
-                                'menus': menus,
-                                'amount': amount
-                            }
-                            structured_data.append(data)
-                            
-                        except Exception as e:
-                            logger.warning(f"詳細要素の解析でエラー: {e}")
-                            continue
-                    
-                except Exception as e:
-                    logger.warning(f"記事の解析でエラー: {e}")
-                    continue
-            
-            logger.info(f"食事履歴データの抽出が完了しました。取得件数: {len(structured_data)}")
-            return structured_data
-            
-        except Exception as e:
-            logger.error(f"食事履歴データ抽出エラー: {e}")
-            return []
-    
-    def run(self):
+    def run(self) -> bool:
         """スクレイピングを実行"""
         try:
             logger.info("食事履歴スクレイピングを開始します")
             
-            # ドライバーをセットアップ
-            if not self.setup_driver():
+            # WebDriverをセットアップ
+            if not self.webdriver_manager.setup_driver():
+                logger.error("WebDriverのセットアップに失敗しました")
                 return False
             
             # ログイン
-            if not self.login():
+            if not self.login_manager.login(self.login_url):
+                logger.error("ログインに失敗しました")
                 return False
             
             # 食事履歴ページに遷移
-            if not self.navigate_to_meal_history():
+            if not self.navigation_manager.navigate_to_meal_history():
+                logger.error("食事履歴ページへの遷移に失敗しました")
                 return False
             
             # ご利用明細を選択
-            if not self.select_usage_detail():
+            if not self.navigation_manager.select_usage_detail():
+                logger.error("ご利用明細の選択に失敗しました")
                 return False
             
             # 食事履歴データを抽出
-            structured_data = self.extract_meal_data()
+            structured_data = self.data_extractor.extract_meal_data()
             
             if not structured_data:
                 logger.error("食事履歴データの取得に失敗しました")
                 return False
             
-            # メール通知を送信（1週間分のみ表示）
+            # データの妥当性をチェック
+            if not self.data_extractor.validate_extracted_data(structured_data):
+                logger.warning("抽出されたデータに問題があります")
+            
+            # データサマリーを取得
+            summary = self.data_extractor.get_data_summary(structured_data)
+            logger.info(f"データ抽出完了: {summary}")
+            
+            # CSVファイルに保存
+            csv_path = self.csv_handler.save_data(structured_data)
+            if csv_path:
+                logger.info(f"CSVファイルに保存しました: {csv_path}")
+            
+            # メール通知を送信
             self.email_sender.send_notification(structured_data)
             
             logger.info("食事履歴スクレイピングが完了しました")
@@ -380,15 +118,44 @@ class MealHistoryScraper:
         finally:
             self.cleanup()
     
-    def cleanup(self):
+    def cleanup(self) -> None:
         """リソースをクリーンアップ"""
+        self.webdriver_manager.cleanup()
+    
+    def get_data_summary(self) -> Optional[Dict[str, Any]]:
+        """データサマリーを取得（テスト用）"""
         try:
-            if self.driver:
-                time.sleep(WAIT_TIMES["before_close"])
-                self.driver.quit()
-                logger.info("ブラウザを閉じました")
+            # WebDriverをセットアップ
+            if not self.webdriver_manager.setup_driver():
+                return None
+            
+            # ログイン
+            if not self.login_manager.login(self.login_url):
+                return None
+            
+            # 食事履歴ページに遷移
+            if not self.navigation_manager.navigate_to_meal_history():
+                return None
+            
+            # ご利用明細を選択
+            if not self.navigation_manager.select_usage_detail():
+                return None
+            
+            # 食事履歴データを抽出
+            structured_data = self.data_extractor.extract_meal_data()
+            
+            if not structured_data:
+                return None
+            
+            # データサマリーを取得
+            return self.data_extractor.get_data_summary(structured_data)
+            
         except Exception as e:
-            logger.error(f"クリーンアップエラー: {e}")
+            logger.error(f"データサマリー取得エラー: {e}")
+            return None
+        
+        finally:
+            self.cleanup()
 
 def main():
     """メイン実行関数"""

@@ -1,48 +1,91 @@
-# 食事履歴スクレイピング
+# 広島大学生協 食事履歴自動取得システム
 
-広島大学生協の食事履歴を自動取得し、CSVファイルに保存するスクレイピングツールです。
+広島大学生協の食事履歴を自動取得し、CSV保存・iPhone対応HTMLメール通知を行うPythonプロジェクトです。
 
 ## 機能
 
-- 広島大学生協サイトへの自動ログイン
-- 食事履歴データの自動取得
-- CSVファイルへの保存
-- **iPhone対応HTMLメール通知機能** ✨
-- ログ機能
+- **自動スクレイピング**: Seleniumを使用した広島大学生協サイトからの食事履歴自動取得
+- **CSV保存**: 取得したデータをCSVファイルに自動保存
+- **メール通知**: iPhone最適化されたHTMLメールでの自動通知
+- **暗号化認証情報管理**: セキュアな認証情報の保存・管理
+- **モジュラー設計**: 機能ごとの分離による保守性・拡張性の向上
 
-## バージョン履歴
-
-### v1.2.0 (2025-06-29)
-- **iPhone対応HTMLメールテンプレート**を実装
-  - インラインCSS + テーブルレイアウト
-  - 背景色の確実な表示（#f0f0f0）
-  - 600px以内の固定幅
-  - Arial, sans-serifフォント
-  - モバイルでも崩れない1カラムレイアウト
-  - Apple Mailでの完全対応
-
-### v1.1.0
-- 基本的なスクレイピング機能
-- CSV保存機能
-- メール通知機能
-
-## ファイル構成
+## プロジェクト構造
 
 ```
 GetMeneAndReport/
-├── config.py                 # 設定ファイル
-├── meal_scraper.py           # メインスクレイピングクラス
-├── requirements.txt          # 依存関係
-├── .env                      # 環境変数（要作成）
-├── utils/                    # ユーティリティ
-│   ├── __init__.py
-│   ├── logger.py             # ログ機能
-│   ├── email_sender.py       # メール送信機能（iPhone対応）
-│   └── csv_handler.py        # CSV処理機能
-├── tests/                    # テストファイル
-├── logs/                     # ログファイル
-└── debug/                    # デバッグファイル
+├── meal_scraper.py          # メインスクレイパー（統合インターフェース）
+├── config.py               # 設定ファイル
+├── setup_credentials.py    # 認証情報設定
+├── requirements.txt        # 依存関係
+├── README.md              # このファイル
+├── debug/                 # デバッグ用ファイル
+├── logs/                  # ログファイル
+└── utils/                 # ユーティリティモジュール
+    ├── __init__.py
+    ├── logger.py          # ログ管理
+    ├── csv_handler.py     # CSV処理
+    ├── encryption.py      # 暗号化
+    ├── webdriver_manager.py    # WebDriver管理
+    ├── selector_manager.py     # セレクター管理
+    ├── login_manager.py        # ログイン管理
+    ├── navigation_manager.py   # ナビゲーション管理
+    ├── data_extractor.py       # データ抽出
+    ├── data_processor.py       # データ処理
+    ├── html_template.py        # HTMLテンプレート生成
+    ├── email_config.py         # メール設定管理
+    ├── smtp_sender.py          # SMTP送信
+    └── email_sender.py         # メール送信統合
 ```
+
+## モジュラー設計の利点
+
+### Webスクレイピング機能の分離
+
+プロジェクトは以下の5つの主要なWebスクレイピングモジュールに分離されています：
+
+1. **WebDriver管理** (`utils/webdriver_manager.py`)
+   - Selenium WebDriverの設定・管理・クリーンアップ
+   - ヘッドレスモード対応
+   - デバッグ用HTML保存機能
+
+2. **セレクター管理** (`utils/selector_manager.py`)
+   - Web要素のセレクターを一元管理
+   - サイト構造変更への対応
+   - セレクターの妥当性チェック
+
+3. **ログイン管理** (`utils/login_manager.py`)
+   - Webサイトへのログイン処理
+   - 複数回ログイン対応
+   - ログイン状態チェック
+
+4. **ナビゲーション管理** (`utils/navigation_manager.py`)
+   - ページ遷移処理
+   - リンククリック処理
+   - 動的要素の操作
+
+5. **データ抽出** (`utils/data_extractor.py`)
+   - 食事履歴データの抽出
+   - データ妥当性チェック
+   - データサマリー生成
+
+### メール機能の分離
+
+メール機能も以下の5つのモジュールに分離されています：
+
+1. **データ処理** (`utils/data_processor.py`)
+2. **HTMLテンプレート生成** (`utils/html_template.py`)
+3. **メール設定管理** (`utils/email_config.py`)
+4. **SMTP送信** (`utils/smtp_sender.py`)
+5. **メール送信統合** (`utils/email_sender.py`)
+
+### 設計原則
+
+- **単一責任の原則**: 各モジュールは1つの明確な責任を持つ
+- **依存性注入**: モジュール間の依存関係を明確化
+- **設定の外部化**: 設定をconfig.pyで一元管理
+- **エラーハンドリング**: 各モジュールで適切なエラー処理
+- **ログ出力**: 詳細なログによる動作追跡
 
 ## セットアップ
 
@@ -52,104 +95,167 @@ GetMeneAndReport/
 pip install -r requirements.txt
 ```
 
-### 2. 環境変数の設定
+### 2. 認証情報の設定
 
-`.env`ファイルを作成し、以下の内容を設定してください：
-
-```env
-EMAIL=your_email@example.com
-PASSWORD=your_password
-SENDER_EMAIL=your_sender_email@gmail.com
-SENDER_PASSWORD=your_app_password
-RECIPIENT_EMAIL=recipient@example.com
+```bash
+python setup_credentials.py
 ```
 
-### 3. 実行
+### 3. 設定ファイルの確認
+
+`config.py`で以下の設定を確認・調整してください：
+
+- `EMAIL`, `PASSWORD`: 生協のログイン情報
+- `SELECTORS`: Web要素のセレクター
+- `WAIT_TIMES`: 待機時間設定
+- `SELENIUM_CONFIG`: Selenium設定
+- メール設定
+
+## 使用方法
+
+### 基本的な実行
 
 ```bash
 python meal_scraper.py
 ```
 
-## 設定
+### テスト実行
 
-`config.py`で以下の設定を変更できます：
+各モジュールの独立動作を確認：
 
-- Selenium設定（ヘッドレスモード、タイムアウト等）
-- セレクター設定
-- ファイルパス設定
-- メール設定
-- ログ設定
-- 待機時間設定
+```bash
+# メール機能テスト
+python test_modular_email.py
 
-## 出力
+# Webスクレイピング機能テスト
+python test_modular_scraper.py
+```
 
-- `meal_history.csv`: 食事履歴データ
-- `logs/scraper.log`: ログファイル
+### 個別モジュールの使用例
 
-## メール通知
+```python
+from utils import WebDriverManager, SelectorManager, LoginManager
 
-### iPhone対応HTMLメール機能
+# WebDriver管理
+config = {"headless": True, "timeout": 10}
+with WebDriverManager(config) as wdm:
+    wdm.navigate_to("https://example.com")
 
-メール設定が正しく設定されている場合、スクレイピング完了時に美しいHTMLメールが送信されます。
+# セレクター管理
+sm = SelectorManager()
+selectors = sm.get_login_selectors()
 
-**特徴:**
-- ✅ iPhoneのApple Mailで完全対応
-- ✅ PCブラウザでも美しく表示
-- ✅ インラインCSS + テーブルレイアウト
-- ✅ 背景色の確実な表示
-- ✅ 600px以内の固定幅
-- ✅ 時間帯別アイコン（🌅朝食、☀️昼食、🌙夕食）
-- ✅ 最新1週間分のデータを自動フィルタリング
+# ログイン管理
+credentials = ("email@example.com", "password")
+lm = LoginManager(wdm, sm, credentials, config)
+success = lm.login("https://login.example.com")
+```
 
-**メール内容:**
-- 取得サマリー（件数、期間）
-- 日付別の食事履歴
-- 時間帯、メニュー、金額の詳細表示
-- 美しいカラーデザイン
+## 設定のカスタマイズ
 
-## ログ
+### セレクターの変更
 
-ログは`logs/scraper.log`に保存され、コンソールにも表示されます。
+サイト構造が変更された場合、`config.py`の`SELECTORS`を更新：
+
+```python
+SELECTORS = {
+    "email_field": "input#new_email_field",
+    "password_field": "input#new_password_field",
+    # その他のセレクター...
+}
+```
+
+### 待機時間の調整
+
+ネットワーク環境に応じて`WAIT_TIMES`を調整：
+
+```python
+WAIT_TIMES = {
+    "timeout": 15,        # 要素待機時間
+    "page_load": 8,       # ページ読み込み待機
+    "after_login": 5,     # ログイン後待機
+    "after_click": 8,     # クリック後待機
+    "element_load": 3,    # 要素読み込み待機
+    "before_close": 15    # ブラウザ閉じる前待機
+}
+```
+
+### Selenium設定の調整
+
+```python
+SELENIUM_CONFIG = {
+    "headless": True,     # ヘッドレスモード
+    "timeout": 30         # タイムアウト時間
+}
+```
 
 ## トラブルシューティング
 
-### ChromeDriverのエラー
+### よくある問題
 
-ChromeDriverManagerが自動的に適切なバージョンをダウンロードします。
+1. **ログインエラー**
+   - 認証情報を確認
+   - セレクターが正しいか確認
+   - デバッグHTMLを確認
 
-### ログインエラー
+2. **データ取得エラー**
+   - サイト構造の変更を確認
+   - セレクターの更新が必要か確認
 
-- メールアドレスとパスワードが正しいことを確認
-- 2段階認証が有効な場合はアプリパスワードを使用
+3. **メール送信エラー**
+   - SMTP設定を確認
+   - 認証情報を確認
 
-### セレクターエラー
+### デバッグ方法
 
-サイトの構造が変更された場合は、`config.py`の`SELECTORS`を更新してください。
+1. **ログの確認**
+   ```bash
+   tail -f logs/scraper.log
+   ```
 
-### メール送信エラー
+2. **デバッグHTMLの確認**
+   ```bash
+   cat debug/login_page_debug.html
+   ```
 
-- Gmailの場合はアプリパスワードを使用
-- SMTP設定が正しいことを確認
-- ファイアウォールでポート587が開いていることを確認
+3. **個別モジュールのテスト**
+   ```bash
+   python test_modular_scraper.py
+   ```
 
-## 開発
+## 今後の拡張性
 
-### テスト
+### ログイン方法の変更対応
 
-```bash
-# HTMLメールテンプレートテスト
-python test_html_email_v4.py
+新しいログイン方式が導入された場合：
 
-# 実際のデータでのメール送信テスト
-python test_actual_email.py
-```
+1. `utils/login_manager.py`の`LoginManager`クラスを拡張
+2. 新しいログイン方式用のメソッドを追加
+3. 設定でログイン方式を選択可能に
 
-### 新しい機能の追加
+### サイト構造変更への対応
 
-1. `utils/`ディレクトリに新しいユーティリティを追加
-2. `config.py`に設定を追加
-3. `meal_scraper.py`に機能を統合
+サイト構造が変更された場合：
+
+1. `utils/selector_manager.py`でセレクターを更新
+2. 必要に応じて`utils/data_extractor.py`を調整
+3. 設定ファイルでセレクターを管理
+
+### 新しいデータ形式への対応
+
+新しいデータ形式に対応する場合：
+
+1. `utils/data_extractor.py`に新しい抽出ロジックを追加
+2. `utils/data_processor.py`で新しいデータ処理を実装
+3. `utils/html_template.py`で新しい表示形式を追加
 
 ## ライセンス
 
-MIT License 
+このプロジェクトはMITライセンスの下で公開されています。
+
+## 注意事項
+
+- 本ツールは教育目的で作成されています
+- 生協の利用規約を遵守してご利用ください
+- 過度なアクセスは避けてください
+- 取得したデータの取り扱いには十分ご注意ください 

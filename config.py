@@ -73,7 +73,9 @@ EMAIL_CONFIG = {
     "smtp_port": 587,
     "sender_email": os.getenv("SENDER_EMAIL", ""),
     "sender_password": os.getenv("SENDER_PASSWORD", ""),
-    "recipient_email": os.getenv("RECIPIENT_EMAIL", "")
+    "recipient_email": os.getenv("RECIPIENT_EMAIL", ""),
+    "email_width": 240,  # HTMLメールの幅（px）
+    "subject_template": "ミールカード　食べたもの {date}"
 }
 
 # ログ設定
