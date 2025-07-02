@@ -13,7 +13,7 @@ logger = logging.getLogger(__name__)
 class HTMLTemplateGenerator:
     """HTMLテンプレート生成クラス"""
     
-    def __init__(self, email_width: int = 300):
+    def __init__(self, email_width: int = 400):
         self.email_width = email_width
     
     def create_email_body(self, structured_data: List[Dict[str, Any]], total_data_count: Optional[int] = None) -> str:
@@ -90,7 +90,7 @@ class HTMLTemplateGenerator:
     def _create_summary_text(self, structured_data: List[Dict[str, Any]], total_data_count: Optional[int]) -> str:
         """サマリーテキストを生成"""
         if total_data_count and total_data_count > len(structured_data):
-            return f"取得件数: <strong>{len(structured_data)}件</strong> (全{total_data_count}件のうち最新1週間分)"
+            return f"取得件数: <strong>{len(structured_data)}件</strong> (全{total_data_count}件のうち最新10日間分)"
         else:
             return f"取得件数: <strong>{len(structured_data)}件</strong>"
     
@@ -142,7 +142,7 @@ class HTMLTemplateGenerator:
                                 <tr>
                                     <td style="padding: 10px 12px; border-bottom: 1px solid #e5e5ea; background-color: {bg_color};">
                                         <div style="background-color: #007AFF; color: #ffffff; padding: 3px 6px; border-radius: 3px; font-size: 12px; font-weight: 500; display: inline-block; margin-bottom: 3px; font-family: Arial, sans-serif;">{time_icon} {meal['hour']}</div>
-                                        <div style="color: #666666; font-size: 13px; margin-bottom: 3px; font-family: Arial, sans-serif;">{menu_html}</div>
+                                        <div style="color: #666666; font-size: 14px; margin-bottom: 3px; font-family: Arial, sans-serif;">{menu_html}</div>
                                         <div style="color: #34c759; font-weight: 500; font-size: 13px; font-family: Arial, sans-serif;">💰 {meal['amount']}</div>
                                     </td>
                                 </tr>

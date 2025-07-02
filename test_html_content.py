@@ -16,8 +16,8 @@ def create_test_data():
     """テスト用の食事履歴データを作成（曜日付き日付）"""
     test_data = []
     
-    # 今日から7日前までのデータを作成
-    for i in range(7):
+    # 今日から10日前までのデータを作成
+    for i in range(10):
         date = datetime.now() - timedelta(days=i)
         # 曜日の日本語表記
         weekdays = ['月', '火', '水', '木', '金', '土', '日']
@@ -70,7 +70,7 @@ def main():
     email_sender = EmailSender()
     
     # HTMLメール本文を生成
-    html_content = email_sender._create_html_email_body(test_data)
+    html_content = email_sender.html_generator.create_email_body(test_data)
     
     # HTMLファイルに保存
     with open('debug/test_email_content.html', 'w', encoding='utf-8') as f:
@@ -81,9 +81,10 @@ def main():
     
     # 日付フォーマットのテスト
     print("\n🔍 日付フォーマットテスト:")
+    from utils.data_processor import DataProcessor
     for i, data in enumerate(test_data[:3]):
         original = data['date']
-        formatted = email_sender._format_date_with_weekday(original)
+        formatted = DataProcessor.format_date_with_weekday(original)
         print(f"   {i+1}. 元: {original}")
         print(f"      変換後: {formatted}")
     

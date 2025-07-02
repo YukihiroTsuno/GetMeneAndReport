@@ -2,12 +2,12 @@
 食事履歴スクレイピング
 広島大学生協の食事履歴を自動取得
 
-Version: 1.3.0
+Version: 1.4.0
 Author: AI Assistant
-Date: 2024-12-19
+Date: 2025-07-02
 """
 
-__version__ = "1.3.0"
+__version__ = "1.4.0"
 
 import logging
 from typing import Dict, Any, List, Optional

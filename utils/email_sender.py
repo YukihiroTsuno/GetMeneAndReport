@@ -34,8 +34,8 @@ class EmailSender:
     def send_notification(self, structured_data: List[Dict[str, Any]]) -> bool:
         """食事履歴データの通知メールを送信（HTML形式）"""
         try:
-            # 最新の1週間分のデータのみをフィルタリング
-            recent_data = DataProcessor.filter_recent_week_data(structured_data)
+            # 最新の10日間分のデータのみをフィルタリング
+            recent_data = DataProcessor.filter_recent_ten_days_data(structured_data)
             
             # HTMLメール本文を作成
             html_body = self.html_generator.create_email_body(recent_data, len(structured_data))

@@ -58,13 +58,13 @@ class DataProcessor:
             return date_str
     
     @staticmethod
-    def filter_recent_week_data(structured_data: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
-        """最新の1週間分のデータのみをフィルタリング"""
+    def filter_recent_ten_days_data(structured_data: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """最新の10日間分のデータのみをフィルタリング"""
         if not structured_data:
             return structured_data
         
-        # 現在の日付から1週間前の日付を計算
-        one_week_ago = datetime.now() - timedelta(days=7)
+        # 現在の日付から10日前の日付を計算
+        ten_days_ago = datetime.now() - timedelta(days=10)
         
         # データを日付でソート（新しい順）- Noneの場合は最小値として扱う
         def sort_key(data):
@@ -73,14 +73,14 @@ class DataProcessor:
         
         sorted_data = sorted(structured_data, key=sort_key, reverse=True)
         
-        # 1週間以内のデータのみをフィルタリング
+        # 10日間以内のデータのみをフィルタリング
         recent_data = []
         for data in sorted_data:
             date_obj = DataProcessor.parse_date_from_string(data['date'])
-            if date_obj and date_obj >= one_week_ago:
+            if date_obj and date_obj >= ten_days_ago:
                 recent_data.append(data)
         
-        logger.info(f"全データ: {len(structured_data)}件, 1週間分データ: {len(recent_data)}件")
+        logger.info(f"全データ: {len(structured_data)}件, 10日間分データ: {len(recent_data)}件")
         return recent_data
     
     @staticmethod
