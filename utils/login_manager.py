@@ -1,14 +1,11 @@
 """
-ログイン管理機能
+ログイン管理機能（Playwright版）
 Webサイトへのログイン処理を担当
 """
 
 import time
 import logging
-from selenium.webdriver.common.by import By
-from selenium.webdriver.support.ui import WebDriverWait
-from selenium.webdriver.support import expected_conditions as EC
-from selenium.common.exceptions import NoSuchElementException, TimeoutException
+from playwright.sync_api import Page, TimeoutError as PlaywrightTimeoutError
 from typing import Dict, Any, Optional, Tuple
 from .webdriver_manager import WebDriverManager
 from .selector_manager import SelectorManager
@@ -16,7 +13,7 @@ from .selector_manager import SelectorManager
 logger = logging.getLogger(__name__)
 
 class LoginManager:
-    """ログイン管理クラス"""
+    """ログイン管理クラス（Playwright版）"""
     
     def __init__(self, webdriver_manager: WebDriverManager, selector_manager: SelectorManager, credentials: Tuple[str, str], config: Dict[str, Any]):
         self.webdriver_manager = webdriver_manager
@@ -30,14 +27,13 @@ class LoginManager:
             logger.info("ログイン処理を開始します")
             
             if not self.webdriver_manager.is_ready():
-                logger.error("WebDriverが初期化されていません")
+                logger.error("Playwrightブラウザが初期化されていません")
                 return False
             
-            driver = self.webdriver_manager.get_driver()
-            wait = self.webdriver_manager.get_wait()
+            page = self.webdriver_manager.get_page()
             
-            if not driver or not wait:
-                logger.error("WebDriverまたはWebDriverWaitが初期化されていません")
+            if not page:
+                logger.error("Pageオブジェクトが初期化されていません")
                 return False
             
             # ページにアクセス
@@ -51,16 +47,16 @@ class LoginManager:
             self.webdriver_manager.save_debug_html("debug/login_page_debug.html")
             
             # ログインフォームが表示されているかチェック
-            if not self._check_login_form_exists(wait):
+            if not self._check_login_form_exists(page):
                 logger.info("ログインフォームが見つかりません。既にログイン済みの可能性があります")
                 return True
             
             # ログイン情報を入力
-            if not self._input_credentials(driver, wait):
+            if not self._input_credentials(page):
                 return False
             
             # ログインボタンをクリック
-            if not self._click_login_button(driver, wait):
+            if not self._click_login_button(page):
                 return False
             
             # ログイン後の処理を待機
@@ -81,32 +77,29 @@ class LoginManager:
             logger.info("2回目のログイン処理を開始します")
             
             if not self.webdriver_manager.is_ready():
-                logger.error("WebDriverが初期化されていません")
+                logger.error("Playwrightブラウザが初期化されていません")
                 return False
             
-            driver = self.webdriver_manager.get_driver()
-            wait = self.webdriver_manager.get_wait()
+            page = self.webdriver_manager.get_page()
             
-            if not driver or not wait:
-                logger.error("WebDriverまたはWebDriverWaitが初期化されていません")
+            if not page:
+                logger.error("Pageオブジェクトが初期化されていません")
                 return False
             
             # ログインフォームを探す
-            email_field = wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, 'input[name="email"]')))
-            password_field = driver.find_element(By.CSS_SELECTOR, 'input[name="password"]')
+            email_field = page.wait_for_selector('input[name="email"]', timeout=self.config.get("timeout", 30) * 1000)
+            password_field = page.locator('input[name="password"]')
             
             # ログイン情報を入力
-            if self.email and self.password:
-                email_field.clear()
-                email_field.send_keys(self.email)
-                password_field.clear()
-                password_field.send_keys(self.password)
+            if self.email and self.password and email_field:
+                email_field.fill(self.email)
+                password_field.fill(self.password)
             else:
                 logger.error("認証情報が設定されていません")
                 return False
             
             # ログインボタンをクリック
-            login_button = driver.find_element(By.CSS_SELECTOR, 'button#next')
+            login_button = page.locator('button#next')
             login_button.click()
             
             time.sleep(self.config.get("after_login", 5))
@@ -120,35 +113,33 @@ class LoginManager:
             logger.error(f"2回目ログイン処理エラー: {e}")
             return False
     
-    def _check_login_form_exists(self, wait: WebDriverWait) -> bool:
+    def _check_login_form_exists(self, page: Page) -> bool:
         """ログインフォームが存在するかチェック"""
         try:
             selectors = self.selector_manager.get_login_selectors()
-            email_field = wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, selectors["email_field"])))
+            email_field = page.wait_for_selector(selectors["email_field"], timeout=self.config.get("timeout", 30) * 1000)
             logger.info("ログインフォームが表示されています")
             return True
-        except TimeoutException:
+        except PlaywrightTimeoutError:
             return False
     
-    def _input_credentials(self, driver, wait: WebDriverWait) -> bool:
+    def _input_credentials(self, page: Page) -> bool:
         """認証情報を入力"""
         try:
             selectors = self.selector_manager.get_login_selectors()
-            email_field = driver.find_element(By.CSS_SELECTOR, selectors["email_field"])
-            password_field = driver.find_element(By.CSS_SELECTOR, selectors["password_field"])
+            email_field = page.locator(selectors["email_field"])
+            password_field = page.locator(selectors["password_field"])
 
             if self.email and self.password:
-                email_field.clear()
-                email_field.send_keys(self.email)
-                password_field.clear()
-                password_field.send_keys(self.password)
+                email_field.fill(self.email)
+                password_field.fill(self.password)
             else:
                 logger.error("認証情報が設定されていません")
                 return False
             
             # 入力されたパスワード値をログ出力（デバッグ用）
             try:
-                actual_pw = password_field.get_attribute('value')
+                actual_pw = password_field.input_value()
                 logger.info(f"パスワード欄の値（デバッグ用）: {actual_pw}")
             except Exception as e:
                 logger.warning(f"パスワード値取得エラー: {e}")
@@ -159,7 +150,7 @@ class LoginManager:
             logger.error(f"認証情報入力エラー: {e}")
             return False
     
-    def _click_login_button(self, driver, wait: WebDriverWait) -> bool:
+    def _click_login_button(self, page: Page) -> bool:
         """ログインボタンをクリック"""
         try:
             selectors = self.selector_manager.get_login_selectors()
@@ -169,36 +160,35 @@ class LoginManager:
             login_button_selectors = [
                 selectors["login_button"],
                 "input[type='submit']",
-                "button:contains('ログイン')",
-                "button:contains('Login')",
+                "button:has-text('ログイン')",
+                "button:has-text('Login')",
                 "input[value*='ログイン']",
                 "input[value*='Login']"
             ]
             
             for selector in login_button_selectors:
                 try:
-                    if ":contains(" in selector:
-                        # XPathに変換
+                    if ":has-text(" in selector:
+                        # Playwrightのテキストセレクターに変換
                         text = selector.split("'")[1]
-                        xpath_selector = f"//button[contains(text(), '{text}')]"
-                        login_button = driver.find_element(By.XPATH, xpath_selector)
+                        text_selector = f"button:has-text('{text}')"
+                        login_button = page.locator(text_selector)
                     else:
-                        login_button = driver.find_element(By.CSS_SELECTOR, selector)
+                        login_button = page.locator(selector)
                     
-                    if login_button:
+                    if login_button.count() > 0:
                         logger.info(f"ログインボタン発見: {selector}")
                         break
-                except NoSuchElementException:
+                except Exception:
                     continue
             
-            if not login_button:
+            if not login_button or login_button.count() == 0:
                 logger.error("ログインボタンが見つかりませんでした")
                 return False
             
             # ログインボタンをクリック
             login_button.click()
             logger.info("ログインボタンをクリックしました")
-            
             return True
             
         except Exception as e:
@@ -208,8 +198,21 @@ class LoginManager:
     def is_logged_in(self) -> bool:
         """ログイン状態をチェック"""
         try:
-            current_url = self.webdriver_manager.get_current_url()
-            # URLにloginが含まれていない場合はログイン済みと判断
-            return "login" not in current_url.lower()
-        except Exception:
+            if not self.webdriver_manager.is_ready():
+                return False
+            
+            page = self.webdriver_manager.get_page()
+            if not page:
+                return False
+            
+            # ログインフォームが存在しない場合はログイン済みと判断
+            selectors = self.selector_manager.get_login_selectors()
+            try:
+                page.wait_for_selector(selectors["email_field"], timeout=5000)
+                return False  # ログインフォームが存在する
+            except PlaywrightTimeoutError:
+                return True  # ログインフォームが存在しない
+            
+        except Exception as e:
+            logger.warning(f"ログイン状態チェックエラー: {e}")
             return False 

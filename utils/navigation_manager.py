@@ -1,14 +1,11 @@
 """
-ナビゲーション管理機能
+ナビゲーション管理機能（Playwright版）
 Webサイト内のページ遷移を担当
 """
 
 import time
 import logging
-from selenium.webdriver.common.by import By
-from selenium.webdriver.support.ui import WebDriverWait
-from selenium.webdriver.support import expected_conditions as EC
-from selenium.common.exceptions import NoSuchElementException, TimeoutException
+from playwright.sync_api import Page, TimeoutError as PlaywrightTimeoutError
 from typing import Dict, Any, Optional
 from .webdriver_manager import WebDriverManager
 from .selector_manager import SelectorManager
@@ -17,7 +14,7 @@ from .login_manager import LoginManager
 logger = logging.getLogger(__name__)
 
 class NavigationManager:
-    """ナビゲーション管理クラス"""
+    """ナビゲーション管理クラス（Playwright版）"""
     
     def __init__(self, webdriver_manager: WebDriverManager, selector_manager: SelectorManager, login_manager: LoginManager, config: Dict[str, Any]):
         self.webdriver_manager = webdriver_manager
@@ -31,28 +28,33 @@ class NavigationManager:
             logger.info("食事履歴ページに遷移中...")
             
             if not self.webdriver_manager.is_ready():
-                logger.error("WebDriverが初期化されていません")
+                logger.error("Playwrightブラウザが初期化されていません")
                 return False
             
-            driver = self.webdriver_manager.get_driver()
-            wait = self.webdriver_manager.get_wait()
+            page = self.webdriver_manager.get_page()
             
-            if not driver or not wait:
-                logger.error("WebDriverまたはWebDriverWaitが初期化されていません")
+            if not page:
+                logger.error("Pageオブジェクトが初期化されていません")
                 return False
             
             # ミール利用履歴リンクを探してクリック
             selectors = self.selector_manager.get_navigation_selectors()
-            meal_history_link = wait.until(
-                EC.element_to_be_clickable((By.CSS_SELECTOR, selectors["meal_history_link"]))
+            meal_history_link = page.wait_for_selector(
+                selectors["meal_history_link"], 
+                state="visible",
+                timeout=self.config.get("timeout", 30) * 1000
             )
             
-            href = meal_history_link.get_attribute("href")
-            link_text = meal_history_link.text
-            logger.info(f"リンク先URL: {href}")
-            logger.info(f"リンクテキスト: {link_text.strip() if link_text else 'N/A'}")
-            
-            meal_history_link.click()
+            if meal_history_link:
+                href = meal_history_link.get_attribute("href")
+                link_text = meal_history_link.text_content()
+                logger.info(f"リンク先URL: {href}")
+                logger.info(f"リンクテキスト: {link_text.strip() if link_text else 'N/A'}")
+                
+                meal_history_link.click()
+            else:
+                logger.error("ミール利用履歴リンクが見つかりませんでした")
+                return False
             time.sleep(self.config.get("after_click", 8))
             
             # 遷移後の確認
@@ -76,23 +78,28 @@ class NavigationManager:
             logger.info("ご利用明細を選択中...")
             
             if not self.webdriver_manager.is_ready():
-                logger.error("WebDriverが初期化されていません")
+                logger.error("Playwrightブラウザが初期化されていません")
                 return False
             
-            driver = self.webdriver_manager.get_driver()
-            wait = self.webdriver_manager.get_wait()
+            page = self.webdriver_manager.get_page()
             
-            if not driver or not wait:
-                logger.error("WebDriverまたはWebDriverWaitが初期化されていません")
+            if not page:
+                logger.error("Pageオブジェクトが初期化されていません")
                 return False
             
             # ご利用明細リンクを探してクリック
             selectors = self.selector_manager.get_navigation_selectors()
-            usage_detail_link = wait.until(
-                EC.element_to_be_clickable((By.CSS_SELECTOR, selectors["usage_detail_link"]))
+            usage_detail_link = page.wait_for_selector(
+                selectors["usage_detail_link"],
+                state="visible",
+                timeout=self.config.get("timeout", 30) * 1000
             )
             
-            usage_detail_link.click()
+            if usage_detail_link:
+                usage_detail_link.click()
+            else:
+                logger.error("ご利用明細リンクが見つかりませんでした")
+                return False
             time.sleep(self.config.get("after_click", 8))
             
             current_url = self.webdriver_manager.get_current_url()
@@ -110,21 +117,21 @@ class NavigationManager:
             if not self.webdriver_manager.is_ready():
                 return False
             
-            driver = self.webdriver_manager.get_driver()
+            page = self.webdriver_manager.get_page()
             
-            if not driver:
+            if not page:
                 return False
             
             # 「もっと見る」ボタンがあればクリック
             try:
                 selectors = self.selector_manager.get_data_extraction_selectors()
-                more_button = driver.find_element(By.CSS_SELECTOR, selectors["more_button"])
-                if more_button.is_displayed():
+                more_button = page.locator(selectors["more_button"])
+                if more_button.count() > 0 and more_button.is_visible():
                     logger.info("「もっと見る」ボタンをクリックします")
                     more_button.click()
                     time.sleep(self.config.get("element_load", 3))
                     return True
-            except NoSuchElementException:
+            except Exception:
                 logger.info("「もっと見る」ボタンは見つかりませんでした")
                 return True  # ボタンがない場合は正常として扱う
             

@@ -1,11 +1,10 @@
 """
-データ抽出機能
+データ抽出機能（Playwright版）
 Webページから食事履歴データを抽出する
 """
 
 import logging
-from selenium.webdriver.common.by import By
-from selenium.common.exceptions import NoSuchElementException
+from playwright.sync_api import Page
 from typing import Dict, Any, List, Optional
 from .webdriver_manager import WebDriverManager
 from .selector_manager import SelectorManager
@@ -14,7 +13,7 @@ from .navigation_manager import NavigationManager
 logger = logging.getLogger(__name__)
 
 class DataExtractor:
-    """データ抽出クラス"""
+    """データ抽出クラス（Playwright版）"""
     
     def __init__(self, webdriver_manager: WebDriverManager, selector_manager: SelectorManager, navigation_manager: NavigationManager):
         self.webdriver_manager = webdriver_manager
@@ -27,13 +26,13 @@ class DataExtractor:
             logger.info("食事履歴データの抽出を開始します")
             
             if not self.webdriver_manager.is_ready():
-                logger.error("WebDriverが初期化されていません")
+                logger.error("Playwrightブラウザが初期化されていません")
                 return []
             
-            driver = self.webdriver_manager.get_driver()
+            page = self.webdriver_manager.get_page()
             
-            if not driver:
-                logger.error("WebDriverが初期化されていません")
+            if not page:
+                logger.error("Pageオブジェクトが初期化されていません")
                 return []
             
             # 「もっと見る」ボタンをクリック
@@ -41,7 +40,7 @@ class DataExtractor:
             
             # 食事履歴記事を取得
             selectors = self.selector_manager.get_data_extraction_selectors()
-            history_articles = driver.find_elements(By.CSS_SELECTOR, selectors["history_articles"])
+            history_articles = page.locator(selectors["history_articles"]).all()
             logger.info(f"発見された食事履歴記事数: {len(history_articles)}")
             
             structured_data = []
@@ -49,25 +48,29 @@ class DataExtractor:
             for article in history_articles:
                 try:
                     # 日付情報を取得
-                    date_element = article.find_element(By.CSS_SELECTOR, selectors["date_element"])
-                    month = date_element.find_element(By.CSS_SELECTOR, selectors["month_span"]).text.strip()
-                    date = date_element.find_element(By.CSS_SELECTOR, selectors["date_span"]).text.strip()
-                    day = date_element.find_element(By.CSS_SELECTOR, selectors["day_span"]).text.strip()
-                    date_str = f"{month}月{date}日({day})"
+                    date_element = article.locator(selectors["date_element"])
+                    month = date_element.locator(selectors["month_span"]).text_content() or ""
+                    date = date_element.locator(selectors["date_span"]).text_content() or ""
+                    day = date_element.locator(selectors["day_span"]).text_content() or ""
+                    date_str = f"{month.strip()}月{date.strip()}日({day.strip()})"
                     
                     # 詳細要素を取得
-                    detail_elements = article.find_elements(By.CSS_SELECTOR, selectors["detail_elements"])
+                    detail_elements = article.locator(selectors["detail_elements"]).all()
                     
                     for detail_element in detail_elements:
                         try:
                             # 時刻、メニュー、金額を取得
-                            hour = detail_element.find_element(By.CSS_SELECTOR, selectors["hour_element"]).text.strip()
+                            hour = detail_element.locator(selectors["hour_element"]).text_content() or ""
                             
-                            menu_elements = detail_element.find_elements(By.CSS_SELECTOR, selectors["menu_elements"])
-                            menus = [menu.text.strip() for menu in menu_elements if menu.text.strip()]
+                            menu_elements = detail_element.locator(selectors["menu_elements"]).all()
+                            menus = []
+                            for menu in menu_elements:
+                                text = menu.text_content()
+                                if text and text.strip():
+                                    menus.append(text.strip())
                             
-                            amount_element = detail_element.find_element(By.CSS_SELECTOR, selectors["amount_element"])
-                            amount = amount_element.text.strip()
+                            amount_element = detail_element.locator(selectors["amount_element"])
+                            amount = amount_element.text_content() or ""
                             
                             # 構造化データに追加
                             data = {

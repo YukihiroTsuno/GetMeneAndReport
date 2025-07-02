@@ -22,13 +22,14 @@ def get_credentials():
 
 EMAIL, PASSWORD = get_credentials()
 
-# Selenium設定
-SELENIUM_CONFIG = {
-    "headless": False,  # ヘッドレスモード（Trueで非表示）
+# Playwright設定
+PLAYWRIGHT_CONFIG = {
+    "headless": True,  # ヘッドレスモード（Trueで非表示）
     "window_size": (1920, 1080),
-    "implicit_wait": 10,
-    "page_load_timeout": 30,
-    "script_timeout": 30
+    "page_load_timeout": 30000,  # 30秒
+    "navigation_timeout": 30000,  # ナビゲーションタイムアウト（30秒）
+    "wait_for_timeout": 5000,  # 要素待機タイムアウト（5秒）
+    "user_agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
 }
 
 # セレクター設定
@@ -87,7 +88,7 @@ LOG_CONFIG = {
 
 # 待機時間設定
 WAIT_TIMES = {
-    "timeout": 30,
+    "timeout": 30000,  # 30秒
     "page_load": 5,
     "element_load": 3,
     "after_click": 8,

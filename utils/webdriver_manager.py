@@ -1,124 +1,127 @@
 """
-WebDriver管理機能
-Selenium WebDriverの設定、管理、クリーンアップを担当
+Webブラウザ管理機能（Playwright版）
+Playwrightの設定、管理、クリーンアップを担当
 """
 
 import time
 import logging
-from selenium import webdriver
-from selenium.webdriver.chrome.service import Service
-from selenium.webdriver.chrome.options import Options
-from selenium.webdriver.support.ui import WebDriverWait
-from webdriver_manager.chrome import ChromeDriverManager
+from playwright.sync_api import sync_playwright, Browser, Page
 from typing import Optional, Dict, Any
 
 logger = logging.getLogger(__name__)
 
 class WebDriverManager:
-    """WebDriver管理クラス"""
+    """Playwrightブラウザ管理クラス"""
     
     def __init__(self, config: Dict[str, Any]):
         self.config = config
-        self.driver: Optional[webdriver.Chrome] = None
-        self.wait: Optional[WebDriverWait] = None
+        self.playwright = None
+        self.browser: Optional[Browser] = None
+        self.page: Optional[Page] = None
     
     def setup_driver(self) -> bool:
-        """Chromeドライバーをセットアップ"""
+        """Playwrightブラウザをセットアップ"""
         try:
-            logger.info("Chromeドライバーをセットアップ中...")
+            logger.info("Playwrightブラウザをセットアップ中...")
             
-            # Chromeオプションを設定
-            chrome_options = Options()
+            # 既存のリソースをクリーンアップ
+            if self.browser:
+                self.browser.close()
+                self.browser = None
+            if self.playwright:
+                self.playwright.stop()
+                self.playwright = None
             
-            if self.config.get("headless", False):
-                chrome_options.add_argument("--headless")
+            # Playwrightを初期化
+            self.playwright = sync_playwright().start()
+            headless = self.config.get("headless", False)
             
-            chrome_options.add_argument("--no-sandbox")
-            chrome_options.add_argument("--disable-dev-shm-usage")
-            chrome_options.add_argument("--disable-gpu")
-            chrome_options.add_argument("--window-size=1920,1080")
-            chrome_options.add_argument("--user-agent=Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
+            # シンプルなブラウザ起動
+            self.browser = self.playwright.chromium.launch(headless=headless)
             
-            # ChromeDriverManagerでドライバーを自動管理
-            service = Service(ChromeDriverManager().install())
+            # 新しいページを作成
+            self.page = self.browser.new_page()
             
-            # WebDriverを作成
-            self.driver = webdriver.Chrome(service=service, options=chrome_options)
-            self.wait = WebDriverWait(self.driver, self.config.get("timeout", 30))
+            # ウィンドウサイズやUAなども必要に応じて設定
+            self.page.set_viewport_size({"width": 1920, "height": 1080})
+            self.page.set_extra_http_headers({
+                "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+            })
             
-            logger.info("Chromeドライバーのセットアップが完了しました")
+            logger.info("Playwrightブラウザのセットアップが完了しました")
             return True
             
         except Exception as e:
-            logger.error(f"Chromeドライバーセットアップエラー: {e}")
+            logger.error(f"Playwrightセットアップエラー: {e}")
+            # エラー時はリソースをクリーンアップ
+            self.cleanup()
             return False
     
-    def get_driver(self) -> Optional[webdriver.Chrome]:
-        """WebDriverを取得"""
-        return self.driver
-    
-    def get_wait(self) -> Optional[WebDriverWait]:
-        """WebDriverWaitを取得"""
-        return self.wait
+    def get_page(self) -> Optional[Page]:
+        """Pageオブジェクトを取得"""
+        return self.page
     
     def is_ready(self) -> bool:
-        """WebDriverが準備完了しているかチェック"""
-        return self.driver is not None and self.wait is not None
+        """ブラウザが準備完了しているかチェック"""
+        return self.browser is not None and self.page is not None
     
     def save_debug_html(self, file_path: str = "debug/page_debug.html") -> bool:
         """デバッグ用にHTMLを保存"""
         try:
-            if not self.driver:
+            if not self.page:
                 return False
-            
-            html = self.driver.page_source
+            html = self.page.content()
             with open(file_path, "w", encoding="utf-8") as f:
                 f.write(html)
             logger.info(f"デバッグ用HTMLを保存しました: {file_path}")
             return True
-            
         except Exception as e:
             logger.warning(f"HTML保存エラー: {e}")
             return False
     
     def get_current_url(self) -> str:
         """現在のURLを取得"""
-        if self.driver:
-            return self.driver.current_url
+        if self.page:
+            return self.page.url
         return ""
     
     def navigate_to(self, url: str) -> bool:
         """指定されたURLに遷移"""
         try:
-            if not self.driver:
+            if not self.page:
                 return False
             
-            self.driver.get(url)
-            time.sleep(self.config.get("page_load", 5))
+            # Playwrightの最適化されたナビゲーション
+            self.page.goto(
+                url, 
+                timeout=self.config.get("navigation_timeout", 30000),
+                wait_until="networkidle"  # ネットワークが安定するまで待機
+            )
+            
             logger.info(f"URLに遷移しました: {url}")
             return True
-            
         except Exception as e:
             logger.error(f"URL遷移エラー: {e}")
             return False
     
-    def cleanup(self, wait_time: int = 15) -> None:
+    def cleanup(self, wait_time: int = 3) -> None:
         """リソースをクリーンアップ"""
         try:
-            if self.driver:
+            if self.browser:
                 time.sleep(wait_time)
-                self.driver.quit()
-                self.driver = None
-                self.wait = None
+                self.browser.close()
+                self.browser = None
+                self.page = None
                 logger.info("ブラウザを閉じました")
+            if self.playwright:
+                self.playwright.stop()
+                self.playwright = None
         except Exception as e:
             logger.error(f"クリーンアップエラー: {e}")
     
     def __enter__(self):
-        """コンテキストマネージャー用"""
         self.setup_driver()
         return self
     
     def __exit__(self, exc_type, exc_val, exc_tb):
-        """コンテキストマネージャー用"""
         self.cleanup() 

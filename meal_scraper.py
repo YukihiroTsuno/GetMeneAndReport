@@ -1,13 +1,13 @@
 """
-食事履歴スクレイピング
+食事履歴スクレイピング（Playwright版）
 広島大学生協の食事履歴を自動取得
 
-Version: 1.4.0
+Version: 1.5.0
 Author: AI Assistant
 Date: 2025-07-02
 """
 
-__version__ = "1.4.0"
+__version__ = "1.5.0"
 
 import logging
 from typing import Dict, Any, List, Optional
@@ -21,7 +21,7 @@ from utils.data_extractor import DataExtractor
 from utils.csv_handler import CSVHandler
 
 # 設定をインポート
-from config import EMAIL, PASSWORD, SELECTORS, WAIT_TIMES, SELENIUM_CONFIG, MEAL_PAGE_URL
+from config import EMAIL, PASSWORD, SELECTORS, WAIT_TIMES, PLAYWRIGHT_CONFIG, MEAL_PAGE_URL
 
 logger = setup_logger()
 
@@ -30,13 +30,13 @@ class MealHistoryScraper:
     
     def __init__(self):
         # 設定を準備
-        self.selenium_config = SELENIUM_CONFIG
+        self.playwright_config = PLAYWRIGHT_CONFIG
         self.wait_times = WAIT_TIMES
         self.credentials = (EMAIL or "", PASSWORD or "")
         self.login_url = MEAL_PAGE_URL
         
         # 各マネージャーを初期化
-        self.webdriver_manager = WebDriverManager(self.selenium_config)
+        self.webdriver_manager = WebDriverManager(self.playwright_config)
         self.selector_manager = SelectorManager(SELECTORS)
         self.login_manager = LoginManager(
             self.webdriver_manager, 
